@@ -1,33 +1,81 @@
-#define ledPin 13
+#include <PinChangeInt.h>
 
-int inByte = 0;
-int outByte = 0;
+#define QUAD_A_PIN 2
+#define QUAD_B_PIN 3
+
+volatile int32_t irqCnt;
+volatile int32_t count;
+volatile uint8_t lastA;
+volatile uint8_t lastB;
+volatile uint8_t newA;
+volatile uint8_t newB;
+
+uint8_t irqPin;
+
+void QuadUpdate()
+{
+  newA = digitalRead(QUAD_A_PIN);
+  newB = digitalRead(QUAD_B_PIN);
+
+irqCnt++;
+
+  if ( newA != lastA )
+  {
+    if ( ( newA == 0 && newB == 0 ) || ( newA == 1 && newB == 1) ) 
+    {
+      count--;
+    }
+    else
+    {
+      count++;
+    }
+  }
+
+  if ( newB != lastB )
+  {
+    if ( (newB == 1 && newA == 0) || (newB == 0 && newA == 1) )
+    {
+      count--;
+    }
+    else
+    {
+      count++;
+    }
+  }
+
+
+  lastA = newA;
+  lastB = newB;
+}
+
 
 void setup() 
 {
-  DDRB = DDRB | 0b00111111; // pins 8-13 as output
-  PORTB = 0;
   Serial.begin(115200);
+
+  pinMode(QUAD_A_PIN, INPUT);
+  pinMode(QUAD_B_PIN, INPUT);
+
+  // enable internal pullups
+  digitalWrite(QUAD_A_PIN, HIGH);
+  digitalWrite(QUAD_B_PIN, HIGH);
+
+  irqCnt = 0;
+  count = 0;
+  lastA = digitalRead(QUAD_A_PIN);
+  lastB = digitalRead(QUAD_B_PIN);
+
+  PCintPort::attachInterrupt(QUAD_A_PIN, &QuadUpdate, CHANGE);
+  PCintPort::attachInterrupt(QUAD_B_PIN, &QuadUpdate, CHANGE);
 }
 
 void loop()
 {
-  // send data only when you receive data:
-  if (Serial.available() > 0) 
-  {
-    // read the incoming byte:
-    inByte = Serial.read();
-
-    if ( digitalRead(2) == false )
-    {
-      outByte++;
-      if ( outByte > 20 )
-      {
-        outByte = 0;
-      }
-    }
-    Serial.write(outByte);
-  }
-
-  PORTB = inByte;
+  Serial.print(irqCnt);
+  Serial.print(",");
+  Serial.print(count);
+  Serial.println();
+  
+  delay(100);
+  
 }
