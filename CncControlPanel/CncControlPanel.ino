@@ -1,81 +1,55 @@
-#include <PinChangeInt.h>
+#include <Encoder.h>
 
-#define QUAD_A_PIN 2
-#define QUAD_B_PIN 3
+#define PIN_MPG_X_A 2
+#define PIN_MPG_X_B 3
 
-volatile int32_t irqCnt;
-volatile int32_t count;
-volatile uint8_t lastA;
-volatile uint8_t lastB;
-volatile uint8_t newA;
-volatile uint8_t newB;
-
-uint8_t irqPin;
-
-void QuadUpdate()
+struct TStatus
 {
-  newA = digitalRead(QUAD_A_PIN);
-  newB = digitalRead(QUAD_B_PIN);
-
-irqCnt++;
-
-  if ( newA != lastA )
-  {
-    if ( ( newA == 0 && newB == 0 ) || ( newA == 1 && newB == 1) ) 
-    {
-      count--;
-    }
-    else
-    {
-      count++;
-    }
-  }
-
-  if ( newB != lastB )
-  {
-    if ( (newB == 1 && newA == 0) || (newB == 0 && newA == 1) )
-    {
-      count--;
-    }
-    else
-    {
-      count++;
-    }
-  }
+  int8_t  sync;
+  int32_t mpgXcount;
+  int32_t mpgYcount;
+  int32_t mpgZcount;
+  int8_t  portA;
+  int8_t  portB;
+  int8_t  portC;
+  int8_t  portD;
+};
 
 
-  lastA = newA;
-  lastB = newB;
-}
-
+Encoder mpgX(PIN_MPG_X_A, PIN_MPG_X_B);
+TStatus statusRec;
+int     inByte;
 
 void setup() 
 {
   Serial.begin(115200);
 
-  pinMode(QUAD_A_PIN, INPUT);
-  pinMode(QUAD_B_PIN, INPUT);
+  pinMode(8, INPUT);
+  pinMode(9, INPUT);
+  
+  mpgX.write(0);
 
-  // enable internal pullups
-  digitalWrite(QUAD_A_PIN, HIGH);
-  digitalWrite(QUAD_B_PIN, HIGH);
-
-  irqCnt = 0;
-  count = 0;
-  lastA = digitalRead(QUAD_A_PIN);
-  lastB = digitalRead(QUAD_B_PIN);
-
-  PCintPort::attachInterrupt(QUAD_A_PIN, &QuadUpdate, CHANGE);
-  PCintPort::attachInterrupt(QUAD_B_PIN, &QuadUpdate, CHANGE);
+  statusRec.sync  = 0x55;
+  statusRec.mpgXcount = 0;
+  statusRec.mpgYcount = 0;
+  statusRec.mpgZcount = 0;
+  statusRec.portA = 0;
+  statusRec.portB = 0; 
+  statusRec.portC = 0;
+  statusRec.portD = 0;
 }
 
 void loop()
 {
-  Serial.print(irqCnt);
-  Serial.print(",");
-  Serial.print(count);
-  Serial.println();
-  
-  delay(100);
-  
+  // send data only when you receive data:
+  if (Serial.available() > 0) 
+  {
+    // Wait for incoming data;
+    inByte = Serial.read();
+
+    // Update the status record and transmit it 
+    statusRec.mpgXcount = mpgX.read();
+    statusRec.portB     = digitalRead(8);  
+    Serial.write(reinterpret_cast<char*>(&statusRec), sizeof(statusRec));
+  }
 }
